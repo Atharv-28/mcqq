@@ -38,6 +38,7 @@ import {
   WorkspacePremium
 } from '@mui/icons-material';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
+import quizAPI from '../../services/api';
 import styles from './page.module.css';
 
 // Custom theme
@@ -108,112 +109,13 @@ const theme = createTheme({
   },
 });
 
-// Sample leaderboard data (will be replaced with real data from backend)
-const sampleLeaderboard = [
-  {
-    id: 1,
-    username: 'QuizMaster_Pro',
-    score: 95,
-    totalQuestions: 10,
-    percentage: 95,
-    subject: 'Technology',
-    subCategory: 'Programming',
-    difficulty: 'Hard',
-    completedAt: Date.now() - 3600000, // 1 hour ago
-    avatar: null
-  },
-  {
-    id: 2,
-    username: 'SportsFanatic',
-    score: 90,
-    totalQuestions: 10,
-    percentage: 90,
-    subject: 'Sports',
-    subCategory: 'Formula 1',
-    difficulty: 'Medium',
-    completedAt: Date.now() - 7200000, // 2 hours ago
-    avatar: null
-  },
-  {
-    id: 3,
-    username: 'ScienceGeek',
-    score: 85,
-    totalQuestions: 10,
-    percentage: 85,
-    subject: 'Science',
-    subCategory: 'Physics',
-    difficulty: 'Hard',
-    completedAt: Date.now() - 10800000, // 3 hours ago
-    avatar: null
-  },
-  {
-    id: 4,
-    username: 'HistoryBuff',
-    score: 80,
-    totalQuestions: 10,
-    percentage: 80,
-    subject: 'History',
-    subCategory: 'World Wars',
-    difficulty: 'Medium',
-    completedAt: Date.now() - 14400000, // 4 hours ago
-    avatar: null
-  },
-  {
-    id: 5,
-    username: 'TechExplorer',
-    score: 75,
-    totalQuestions: 10,
-    percentage: 75,
-    subject: 'Technology',
-    subCategory: 'AI & Machine Learning',
-    difficulty: 'Easy',
-    completedAt: Date.now() - 18000000, // 5 hours ago
-    avatar: null
-  },
-  {
-    id: 6,
-    username: 'GeographyWiz',
-    score: 70,
-    totalQuestions: 10,
-    percentage: 70,
-    subject: 'Geography',
-    subCategory: 'World Capitals',
-    difficulty: 'Medium',
-    completedAt: Date.now() - 21600000, // 6 hours ago
-    avatar: null
-  },
-  {
-    id: 7,
-    username: 'MovieBuff',
-    score: 65,
-    totalQuestions: 10,
-    percentage: 65,
-    subject: 'Entertainment',
-    subCategory: 'Movies',
-    difficulty: 'Easy',
-    completedAt: Date.now() - 25200000, // 7 hours ago
-    avatar: null
-  },
-  {
-    id: 8,
-    username: 'PoliticsExpert',
-    score: 60,
-    totalQuestions: 10,
-    percentage: 60,
-    subject: 'Politics',
-    subCategory: 'World Politics',
-    difficulty: 'Hard',
-    completedAt: Date.now() - 28800000, // 8 hours ago
-    avatar: null
-  }
-];
-
 export default function Rankings() {
   const [leaderboard, setLeaderboard] = useState([]);
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
   const [tabValue, setTabValue] = useState(0);
   const [userRank, setUserRank] = useState(null);
+  const [userResults, setUserResults] = useState(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -222,29 +124,149 @@ export default function Rankings() {
 
   useEffect(() => {
     if (mounted) {
-      // Load leaderboard data
-      // For now, use sample data. Later this will be fetched from backend
-      setLeaderboard(sampleLeaderboard);
-      
-      // Check if current user has any results and find their rank
+      loadLeaderboardData();
+    }
+  }, [mounted, tabValue]); // Add tabValue as dependency
+
+  const loadLeaderboardData = async () => {
+    setLoading(true); // Make sure loading is set when fetching new data
+    try {
+      // Get current user's username from localStorage
+      let currentUsername = null;
       if (typeof window !== 'undefined') {
         const resultsData = localStorage.getItem('quizResults');
         if (resultsData) {
           const userResults = JSON.parse(resultsData);
-          // Find user's rank in the leaderboard
-          const rank = sampleLeaderboard.findIndex(entry => 
-            entry.percentage < userResults.percentage
-          );
-          setUserRank(rank === -1 ? sampleLeaderboard.length + 1 : rank + 1);
+          currentUsername = userResults.username;
+          setUserResults(userResults);
         }
+      }
+
+      // Get the current subject filter
+      const subjectFilter = getSubjectFilter(tabValue);
+      console.log('Fetching leaderboard for subject:', subjectFilter);
+
+      // Fetch leaderboard from backend API
+      const leaderboardResponse = await quizAPI.getLeaderboard({
+        limit: 100, // Get top 100 entries
+        subject: subjectFilter,
+      });
+
+      console.log('Leaderboard response:', leaderboardResponse);
+
+      if (leaderboardResponse.success && leaderboardResponse.data) {
+        setLeaderboard(leaderboardResponse.data);
+
+        // Get user's rank if we have their username
+        if (currentUsername) {
+          try {
+            const rankResponse = await quizAPI.getUserRank(currentUsername, {
+              subject: subjectFilter,
+            });
+            
+            if (rankResponse.success && rankResponse.data) {
+              setUserRank(rankResponse.data.rank);
+            }
+          } catch (error) {
+            console.error('Error fetching user rank:', error);
+            // If getUserRank fails, calculate rank from leaderboard data
+            const userIndex = leaderboardResponse.data.findIndex(
+              entry => entry.username === currentUsername
+            );
+            if (userIndex !== -1) {
+              setUserRank(userIndex + 1);
+            }
+          }
+        }
+      } else {
+        console.warn('No leaderboard data received from API');
+        setLeaderboard([]);
       }
       
       setLoading(false);
+    } catch (error) {
+      console.error('Error loading leaderboard:', error);
+      
+      // Fallback to localStorage data if API fails
+      console.log('Falling back to localStorage data...');
+      await loadLocalStorageData();
+      
+      setLoading(false);
     }
-  }, [mounted]);
+  };
+
+  // Helper function to get subject filter for API
+  const getSubjectFilter = (tabIndex) => {
+    switch (tabIndex) {
+      case 1: return 'Technology';
+      case 2: return 'Sports';
+      case 3: return 'Science';
+      default: return null; // All subjects
+    }
+  };
+
+  // Fallback function to load from localStorage (in case API is down)
+  const loadLocalStorageData = async () => {
+    let allUserResults = [];
+    if (typeof window !== 'undefined') {
+      // Try to get all quiz history first
+      const historyData = localStorage.getItem('quizHistory');
+      if (historyData) {
+        allUserResults = JSON.parse(historyData);
+      } else {
+        // Fallback to single result if no history exists
+        const resultsData = localStorage.getItem('quizResults');
+        if (resultsData) {
+          allUserResults = [JSON.parse(resultsData)];
+        }
+      }
+      
+      if (allUserResults.length > 0) {
+        setUserResults(allUserResults[allUserResults.length - 1]); // Set latest result
+      }
+    }
+
+    // Create leaderboard with user's quiz results
+    let leaderboardData = [];
+    
+    if (allUserResults.length > 0) {
+      leaderboardData = allUserResults.map((result, index) => ({
+        id: result.completedAt || Date.now() + index,
+        username: result.username,
+        score: result.score,
+        totalQuestions: result.totalQuestions,
+        percentage: result.percentage,
+        subject: result.subject,
+        subCategory: result.subCategory,
+        difficulty: result.difficulty,
+        completedAt: result.completedAt || Date.now(),
+        avatar: null
+      }));
+      
+      // Sort by percentage (highest first)
+      leaderboardData.sort((a, b) => b.percentage - a.percentage);
+    }
+
+    setLeaderboard(leaderboardData);
+    
+    // Calculate user's best rank
+    if (allUserResults.length > 0) {
+      // Find the best performance (highest percentage)
+      const bestResult = allUserResults.reduce((best, current) => 
+        current.percentage > best.percentage ? current : best
+      );
+      
+      const userBestIndex = leaderboardData.findIndex(entry => 
+        entry.username === bestResult.username && entry.percentage === bestResult.percentage
+      );
+      setUserRank(userBestIndex + 1);
+    }
+  };
 
   const handleTabChange = (event, newValue) => {
+    console.log('Tab changed to:', newValue, 'Subject:', getSubjectFilter(newValue));
     setTabValue(newValue);
+    // Data will reload automatically due to useEffect dependency on tabValue
   };
 
   const getPositionIcon = (position) => {
@@ -290,16 +312,9 @@ export default function Rankings() {
   };
 
   const filteredLeaderboard = () => {
-    switch (tabValue) {
-      case 1: // Technology
-        return leaderboard.filter(entry => entry.subject.toLowerCase() === 'technology');
-      case 2: // Sports
-        return leaderboard.filter(entry => entry.subject.toLowerCase() === 'sports');
-      case 3: // Science
-        return leaderboard.filter(entry => entry.subject.toLowerCase() === 'science');
-      default: // All
-        return leaderboard;
-    }
+    // Since filtering is now done on the API side when fetching data,
+    // we just return the leaderboard as-is
+    return leaderboard;
   };
 
   if (!mounted || loading) {
@@ -378,17 +393,18 @@ export default function Rankings() {
             </Box>
 
             {/* User's Current Rank Card */}
-            {userRank && (
+            {userRank && userResults && (
               <Card sx={{ mb: 4, background: 'white' }}>
                 <CardContent sx={{ p: 3 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                     <TrendingUp sx={{ color: 'primary.main', fontSize: 32 }} />
                     <Box>
                       <Typography variant="h6" sx={{ fontWeight: 700, color: 'primary.main' }}>
-                        Your Current Rank
+                        Your Best Performance
                       </Typography>
                       <Typography variant="body1" color="text.secondary">
-                        You're ranked #{userRank} globally! Keep practicing to climb higher.
+                        Ranked #{userRank} with {userResults.percentage}% in {userResults.subject}. 
+                        {leaderboard.length > 1 && ` You have ${leaderboard.filter(entry => entry.username === userResults.username).length} quiz attempts.`}
                       </Typography>
                     </Box>
                   </Box>
@@ -417,154 +433,178 @@ export default function Rankings() {
             </Paper>
 
             {/* Top 3 Podium */}
-            <Grid container spacing={4} sx={{ mb: 4, justifyContent: 'center', alignItems: 'stretch' }}>
-              {filteredLeaderboard().slice(0, 3).map((entry, index) => {
-                const grade = getGrade(entry.percentage);
-                return (
-                  <Grid item xs={12} md={4} key={entry.id} sx={{ display: 'flex', justifyContent: 'center' }}>
-                    <Card 
-                      sx={{ 
-                        textAlign: 'center',
-                        p: 3,
-                        width: '100%',
-                        maxWidth: 350,
-                        background: index === 0 
-                          ? 'linear-gradient(45deg, #ffd700, #ffed4a)' 
-                          : index === 1 
-                          ? 'linear-gradient(45deg, #c0c0c0, #e5e7eb)'
-                          : 'linear-gradient(45deg, #cd7f32, #d97706)',
-                        color: index === 1 ? 'black' : 'white',
-                        transform: index === 0 ? 'scale(1.05)' : 'scale(1)',
-                        boxShadow: index === 0 ? '0 8px 25px rgba(255, 215, 0, 0.4)' : '0 4px 12px rgba(0, 0, 0, 0.15)',
-                      }}
-                    >
-                      <Box sx={{ mb: 2 }}>
-                        {getPositionIcon(index + 1)}
-                      </Box>
-                      <Avatar 
-                        sx={{ 
-                          width: 64, 
-                          height: 64, 
-                          mx: 'auto', 
-                          mb: 2,
-                          ...generateAvatar(entry.username),
-                          fontSize: '24px',
-                          fontWeight: 700
-                        }}
-                      >
-                        {entry.username.charAt(0).toUpperCase()}
-                      </Avatar>
-                      <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
-                        {entry.username}
-                      </Typography>
-                      <Typography variant="h4" sx={{ fontWeight: 800, mb: 1 }}>
-                        {entry.percentage}%
-                      </Typography>
-                      <Chip 
-                        label={grade.grade}
-                        sx={{ 
-                          backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                          color: 'inherit',
-                          fontWeight: 700
-                        }}
-                      />
-                      <Typography variant="body2" sx={{ mt: 2, opacity: 0.9 }}>
-                        {entry.subject} • {entry.difficulty}
-                      </Typography>
-                    </Card>
-                  </Grid>
-                );
-              })}
-            </Grid>
-
-            {/* Full Leaderboard */}
-            <Paper sx={{ p: 4, borderRadius: 3 }}>
-              <Typography variant="h5" sx={{ mb: 3, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
-                <EmojiEvents sx={{ color: 'primary.main' }} />
-                Complete Rankings
-              </Typography>
-              
-              <List>
-                {filteredLeaderboard().map((entry, index) => {
+            {filteredLeaderboard().length > 0 ? (
+              <Grid container spacing={4} sx={{ mb: 4, justifyContent: 'center', alignItems: 'stretch' }}>
+                {filteredLeaderboard().slice(0, 3).map((entry, index) => {
                   const grade = getGrade(entry.percentage);
                   return (
-                    <React.Fragment key={entry.id}>
-                      <ListItem
-                        sx={{
-                          py: 2,
-                          px: 3,
-                          borderRadius: 2,
-                          mb: 1,
-                          backgroundColor: index < 3 ? 'rgba(102, 126, 234, 0.05)' : 'transparent',
-                          border: index < 3 ? '1px solid rgba(102, 126, 234, 0.1)' : 'none',
+                    <Grid item xs={12} md={4} key={entry.id} sx={{ display: 'flex', justifyContent: 'center' }}>
+                      <Card 
+                        sx={{ 
+                          textAlign: 'center',
+                          p: 3,
+                          width: '100%',
+                          maxWidth: 350,
+                          background: index === 0 
+                            ? 'linear-gradient(45deg, #ffd700, #ffed4a)' 
+                            : index === 1 
+                            ? 'linear-gradient(45deg, #c0c0c0, #e5e7eb)'
+                            : 'linear-gradient(45deg, #cd7f32, #d97706)',
+                          color: index === 1 ? 'black' : 'white',
+                          transform: index === 0 ? 'scale(1.05)' : 'scale(1)',
+                          boxShadow: index === 0 ? '0 8px 25px rgba(255, 215, 0, 0.4)' : '0 4px 12px rgba(0, 0, 0, 0.15)',
                         }}
                       >
-                        <ListItemAvatar>
-                          <Box sx={{ display: 'flex', alignItems: 'center', mr: 2, minWidth: 50 }}>
-                            {getPositionIcon(index + 1)}
-                          </Box>
-                        </ListItemAvatar>
-                        
+                        <Box sx={{ mb: 2 }}>
+                          {getPositionIcon(index + 1)}
+                        </Box>
                         <Avatar 
                           sx={{ 
+                            width: 64, 
+                            height: 64, 
+                            mx: 'auto', 
+                            mb: 2,
                             ...generateAvatar(entry.username),
-                            mr: 2,
-                            fontWeight: 600
+                            fontSize: '24px',
+                            fontWeight: 700
                           }}
                         >
                           {entry.username.charAt(0).toUpperCase()}
                         </Avatar>
-                        
-                        <ListItemText
-                          primary={
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-                              <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                                {entry.username}
-                              </Typography>
-                              <Chip 
-                                label={`${entry.percentage}%`}
-                                size="small"
-                                sx={{ 
-                                  backgroundColor: grade.color,
-                                  color: 'white',
-                                  fontWeight: 600
-                                }}
-                              />
-                              <Chip 
-                                label={grade.grade}
-                                size="small"
-                                variant="outlined"
-                                sx={{ borderColor: grade.color, color: grade.color }}
-                              />
-                            </Box>
-                          }
-                          secondary={
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 1, flexWrap: 'wrap' }}>
-                              <Typography variant="body2" color="text.secondary">
-                                {entry.subject} • {entry.subCategory}
-                              </Typography>
-                              <Chip 
-                                label={entry.difficulty}
-                                size="small"
-                                color={entry.difficulty === 'Hard' ? 'error' : entry.difficulty === 'Medium' ? 'warning' : 'success'}
-                                variant="outlined"
-                              />
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                <Schedule fontSize="small" color="disabled" />
-                                <Typography variant="body2" color="text.secondary">
-                                  {formatTimeAgo(entry.completedAt)}
-                                </Typography>
-                              </Box>
-                            </Box>
-                          }
+                        <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
+                          {entry.username}
+                        </Typography>
+                        <Typography variant="h4" sx={{ fontWeight: 800, mb: 1 }}>
+                          {entry.percentage}%
+                        </Typography>
+                        <Chip 
+                          label={grade.grade}
+                          sx={{ 
+                            backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                            color: 'inherit',
+                            fontWeight: 700
+                          }}
                         />
-                      </ListItem>
-                      {index < filteredLeaderboard().length - 1 && <Divider />}
-                    </React.Fragment>
+                        <Typography variant="body2" sx={{ mt: 2, opacity: 0.9 }}>
+                          {entry.subject} • {entry.difficulty}
+                        </Typography>
+                      </Card>
+                    </Grid>
                   );
                 })}
-              </List>
-            </Paper>
+              </Grid>
+            ) : (
+              <Paper sx={{ p: 4, textAlign: 'center', mb: 4 }}>
+                <Typography variant="h6" color="text.secondary" sx={{ mb: 2 }}>
+                  No quiz results yet!
+                </Typography>
+                <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+                  Take your first quiz to see how you rank against other players.
+                </Typography>
+                <Button
+                  component={Link}
+                  href="/start"
+                  variant="contained"
+                  startIcon={<PlayArrow />}
+                  sx={{
+                    background: 'linear-gradient(45deg, #667eea, #764ba2)',
+                  }}
+                >
+                  Take Your First Quiz
+                </Button>
+              </Paper>
+            )}
+
+            {/* Full Leaderboard */}
+            {filteredLeaderboard().length > 0 ? (
+              <Paper sx={{ p: 4, borderRadius: 3 }}>
+                <Typography variant="h5" sx={{ mb: 3, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <EmojiEvents sx={{ color: 'primary.main' }} />
+                  Complete Rankings
+                </Typography>
+                
+                <List>
+                  {filteredLeaderboard().map((entry, index) => {
+                    const grade = getGrade(entry.percentage);
+                    return (
+                      <React.Fragment key={entry.id}>
+                        <ListItem
+                          sx={{
+                            py: 2,
+                            px: 3,
+                            borderRadius: 2,
+                            mb: 1,
+                            backgroundColor: index < 3 ? 'rgba(102, 126, 234, 0.05)' : 'transparent',
+                            border: index < 3 ? '1px solid rgba(102, 126, 234, 0.1)' : 'none',
+                          }}
+                        >
+                          <ListItemAvatar>
+                            <Box sx={{ display: 'flex', alignItems: 'center', mr: 2, minWidth: 50 }}>
+                              {getPositionIcon(index + 1)}
+                            </Box>
+                          </ListItemAvatar>
+                          
+                          <Avatar 
+                            sx={{ 
+                              ...generateAvatar(entry.username),
+                              mr: 2,
+                              fontWeight: 600
+                            }}
+                          >
+                            {entry.username.charAt(0).toUpperCase()}
+                          </Avatar>
+                          
+                          <ListItemText
+                            primary={
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                                <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                                  {entry.username}
+                                </Typography>
+                                <Chip 
+                                  label={`${entry.percentage}%`}
+                                  size="small"
+                                  sx={{ 
+                                    backgroundColor: grade.color,
+                                    color: 'white',
+                                    fontWeight: 600
+                                  }}
+                                />
+                                <Chip 
+                                  label={grade.grade}
+                                  size="small"
+                                  variant="outlined"
+                                  sx={{ borderColor: grade.color, color: grade.color }}
+                                />
+                              </Box>
+                            }
+                            secondary={
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 1, flexWrap: 'wrap' }}>
+                                <Typography variant="body2" color="text.secondary">
+                                  {entry.subject} • {entry.subCategory}
+                                </Typography>
+                                <Chip 
+                                  label={entry.difficulty}
+                                  size="small"
+                                  color={entry.difficulty === 'Hard' ? 'error' : entry.difficulty === 'Medium' ? 'warning' : 'success'}
+                                  variant="outlined"
+                                />
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  <Schedule fontSize="small" color="disabled" />
+                                  <Typography variant="body2" color="text.secondary">
+                                    {formatTimeAgo(entry.completedAt)}
+                                  </Typography>
+                                </Box>
+                              </Box>
+                            }
+                          />
+                        </ListItem>
+                        {index < filteredLeaderboard().length - 1 && <Divider />}
+                      </React.Fragment>
+                    );
+                  })}
+                </List>
+              </Paper>
+            ) : null}
 
             {/* Call to Action */}
             <Box sx={{ textAlign: 'center', mt: 4 }}>

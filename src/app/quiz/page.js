@@ -127,9 +127,9 @@ function Quiz() {
       
       console.log('📦 Received response from API:', response);
       
-      if (response.success && response.questions && response.questions.length > 0) {
-        console.log('✅ Questions loaded successfully:', response.questions.length, 'questions');
-        setQuestions(response.questions);
+      if (response.success && response.data && response.data.questions && response.data.questions.length > 0) {
+        console.log('✅ Questions loaded successfully:', response.data.questions.length, 'questions');
+        setQuestions(response.data.questions);
       } else {
         console.log('❌ Failed to load questions. Response:', response);
         setError('Failed to load questions. Please try again.');
@@ -167,11 +167,13 @@ function Quiz() {
 
   const handleNextQuestion = () => {
     // Save the answer
+    const selectedOptionText = questions[currentQuestionIndex].options[selectedAnswer];
     const newAnswer = {
       questionId: questions[currentQuestionIndex].id,
       selectedAnswer: selectedAnswer,
+      selectedAnswerText: selectedOptionText,
       correctAnswer: questions[currentQuestionIndex].correctAnswer,
-      isCorrect: selectedAnswer === questions[currentQuestionIndex].correctAnswer,
+      isCorrect: selectedOptionText === questions[currentQuestionIndex].correctAnswer,
       timeSpent: 30 - timeLeft
     };
 
@@ -205,6 +207,7 @@ function Quiz() {
       percentage,
       timeTaken: Math.round((Date.now() - (quizSetup.startTime || Date.now())) / 1000),
       questionsData: finalAnswers,
+      answers: finalAnswers, // Add this for compatibility with results page
       completedAt: Date.now()
     };
 
@@ -218,7 +221,25 @@ function Quiz() {
 
     // Store results in localStorage for results page
     if (typeof window !== 'undefined') {
+      // Store the latest result
       localStorage.setItem('quizResults', JSON.stringify(quizData));
+      
+      // Also maintain a history of all quiz results
+      const existingHistory = localStorage.getItem('quizHistory');
+      let quizHistory = [];
+      if (existingHistory) {
+        quizHistory = JSON.parse(existingHistory);
+      }
+      
+      // Add the new result to history
+      quizHistory.push(quizData);
+      
+      // Limit history to last 50 quizzes to prevent localStorage from getting too large
+      if (quizHistory.length > 50) {
+        quizHistory = quizHistory.slice(-50);
+      }
+      
+      localStorage.setItem('quizHistory', JSON.stringify(quizHistory));
     }
 
     // Navigate to results page

@@ -162,8 +162,11 @@ export default function Results() {
 
   const performance = getPerformanceMessage(results.percentage);
   const grade = getGrade(results.percentage);
-  const totalTime = results.answers.reduce((sum, answer) => sum + answer.timeSpent, 0);
-  const averageTime = Math.round(totalTime / results.answers.length);
+  
+  // Use answers if available, otherwise fall back to questionsData, or provide defaults
+  const answersData = results.answers || results.questionsData || [];
+  const totalTime = answersData.reduce((sum, answer) => sum + (answer.timeSpent || 0), 0);
+  const averageTime = answersData.length > 0 ? Math.round(totalTime / answersData.length) : 0;
 
   return (
     <ThemeProvider theme={theme}>
@@ -353,7 +356,7 @@ export default function Results() {
                   </Typography>
                   
                   <List sx={{ maxWidth: '100%' }}>
-                    {results.answers.map((answer, index) => (
+                    {answersData.map((answer, index) => (
                       <ListItem 
                         key={answer.questionId}
                         sx={{ 
