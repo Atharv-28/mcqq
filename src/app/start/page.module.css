@@ -1,0 +1,248 @@
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-geist-sans);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 40px;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+}
+
+.backLink {
+  color: white;
+  text-decoration: none;
+  padding: 8px 16px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.1);
+  transition: all 0.3s ease;
+  font-weight: 500;
+}
+
+.backLink:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.title {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+}
+
+.setupContainer {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(15px);
+  border-radius: 20px;
+  padding: 40px;
+  max-width: 500px;
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+}
+
+.setupHeader {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.setupTitle {
+  font-size: 32px;
+  font-weight: 800;
+  margin: 0 0 10px 0;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  background: linear-gradient(45deg, #fff, #e0e7ff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.setupDescription {
+  font-size: 16px;
+  margin: 0;
+  opacity: 0.9;
+  line-height: 1.5;
+}
+
+.setupForm {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.label {
+  font-size: 16px;
+  font-weight: 600;
+  color: white;
+  margin-bottom: 5px;
+}
+
+.input,
+.select {
+  padding: 15px 20px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  font-size: 16px;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+}
+
+.input::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.input:focus,
+.select:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+.select option {
+  background: #667eea;
+  color: white;
+  padding: 10px;
+}
+
+.inputError {
+  border-color: #ff6b6b !important;
+  background: rgba(255, 107, 107, 0.1) !important;
+}
+
+.errorText {
+  color: #ff6b6b;
+  font-size: 14px;
+  font-weight: 500;
+  margin-top: 5px;
+}
+
+.formActions {
+  text-align: center;
+  margin-top: 10px;
+}
+
+.startButton {
+  background: #fff;
+  color: #667eea;
+  border: none;
+  padding: 16px 32px;
+  border-radius: 50px;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  width: 100%;
+  max-width: 300px;
+}
+
+.startButton:hover {
+  background: #f8fafc;
+  transform: translateY(-3px);
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.2);
+}
+
+.startButton:active {
+  transform: translateY(-1px);
+}
+
+.quizInfo {
+  margin: 15px 0 0 0;
+  font-size: 14px;
+  opacity: 0.8;
+  color: white;
+}
+
+.footer {
+  text-align: center;
+  padding: 20px 40px;
+  background: rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(10px);
+}
+
+.footer p {
+  margin: 0;
+  opacity: 0.8;
+  font-size: 14px;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .header {
+    padding: 15px 20px;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .title {
+    font-size: 24px;
+  }
+
+  .setupContainer {
+    padding: 30px 20px;
+    margin: 0 10px;
+  }
+
+  .setupTitle {
+    font-size: 28px;
+  }
+
+  .setupDescription {
+    font-size: 15px;
+  }
+
+  .main {
+    padding: 20px 10px;
+  }
+
+  .footer {
+    padding: 15px 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .setupContainer {
+    padding: 25px 15px;
+  }
+
+  .setupTitle {
+    font-size: 24px;
+  }
+
+  .input,
+  .select {
+    padding: 12px 16px;
+    font-size: 15px;
+  }
+
+  .startButton {
+    padding: 14px 28px;
+    font-size: 16px;
+  }
+}
