@@ -194,45 +194,47 @@ export default function Results() {
               {/* Main Score Card */}
               <Grid item xs={12} md={8} sx={{ display: 'flex' }}>
                 <Paper sx={{ p: 4, borderRadius: 3, textAlign: 'center', height: '100%', width: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                  <Box sx={{ position: 'relative', display: 'inline-flex', mb: 3 }}>
-                    <CircularProgress
-                      variant="determinate"
-                      value={100}
-                      size={120}
-                      thickness={4}
-                      sx={{ color: 'rgba(0, 0, 0, 0.1)' }}
-                    />
-                    <CircularProgress
-                      variant="determinate"
-                      value={results.percentage}
-                      size={120}
-                      thickness={4}
-                      sx={{ 
-                        color: performance.color,
-                        position: 'absolute',
-                        left: 0,
-                        strokeLinecap: 'round'
-                      }}
-                    />
-                    <Box
-                      sx={{
-                        top: 0,
-                        left: 0,
-                        bottom: 0,
-                        right: 0,
-                        position: 'absolute',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexDirection: 'column',
-                      }}
-                    >
-                      <Typography variant="h4" component="div" sx={{ fontWeight: 800 }}>
-                        {results.percentage}%
-                      </Typography>
-                      <Typography variant="h6" sx={{ fontWeight: 700, color: performance.color }}>
-                        {grade}
-                      </Typography>
+                  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', mb: 3 }}>
+                    <Box sx={{ position: 'relative', display: 'inline-flex' }}>
+                      <CircularProgress
+                        variant="determinate"
+                        value={100}
+                        size={120}
+                        thickness={4}
+                        sx={{ color: 'rgba(0, 0, 0, 0.1)' }}
+                      />
+                      <CircularProgress
+                        variant="determinate"
+                        value={results.percentage}
+                        size={120}
+                        thickness={4}
+                        sx={{ 
+                          color: performance.color,
+                          position: 'absolute',
+                          left: 0,
+                          strokeLinecap: 'round'
+                        }}
+                      />
+                      <Box
+                        sx={{
+                          top: 0,
+                          left: 0,
+                          bottom: 0,
+                          right: 0,
+                          position: 'absolute',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexDirection: 'column',
+                        }}
+                      >
+                        <Typography variant="h4" component="div" sx={{ fontWeight: 800 }}>
+                          {results.percentage}%
+                        </Typography>
+                        <Typography variant="h6" sx={{ fontWeight: 700, color: performance.color }}>
+                          {grade}
+                        </Typography>
+                      </Box>
                     </Box>
                   </Box>
 
