@@ -49,7 +49,13 @@ app.get('/', (req, res) => {
       'GET /api/questions/subjects',
       'GET /api/questions/subjects/:subject/categories',
       'POST /api/questions/validate',
-      'POST /api/questions/sample'
+      'POST /api/questions/sample',
+      'POST /api/quiz/questions',
+      'POST /api/quiz/submit',
+      'GET /api/quiz/history/:username',
+      'GET /api/leaderboard/global',
+      'GET /api/leaderboard/rank/:username',
+      'GET /api/leaderboard/stats'
     ]
   });
 });
@@ -65,11 +71,10 @@ app.get('/health', (req, res) => {
   });
 });
 
-// API Routes (database-independent routes only for now)
-// app.use('/api/auth', authRoutes);           // Removed - no authentication needed
-// app.use('/api/quiz', quizRoutes);           // Requires database  
-// app.use('/api/leaderboard', leaderboardRoutes); // Requires database
-app.use('/api/questions', questionRoutes);     // Works without database
+// API Routes - All enabled with database connection
+app.use('/api/quiz', quizRoutes);           // Quiz operations
+app.use('/api/leaderboard', leaderboardRoutes); // Leaderboard and stats
+app.use('/api/questions', questionRoutes);     // Question management
 
 // Global error handler
 app.use((err, req, res, next) => {
@@ -92,23 +97,21 @@ app.use('*', (req, res) => {
 // Initialize database and start server
 async function startServer() {
   try {
-    // TODO: Connect to database when ready
-    // await connectDB();
-    // console.log('✅ Database connected successfully');
+    // Connect to database
+    await connectDB();
+    console.log('✅ Database connected successfully');
     
-    // TODO: Create tables when database is ready
-    // await createTables();
-    // console.log('✅ Database tables created/verified');
-    
-    console.log('⚠️ Running without database connection');
+    // Create tables if they don't exist
+    await createTables();
+    console.log('✅ Database tables created/verified');
     
     // Start server
     app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📡 API endpoint: http://localhost:${PORT}`);
       console.log(`🌐 CORS: Allowing all origins (*)`);
-      console.log(`💡 Database connection disabled for testing`);
-      console.log(`🔥 Ready for frontend integration!`);
+      console.log(`� Database: Connected to PostgreSQL`);
+      console.log(`🔥 Ready for full functionality!`);
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);
