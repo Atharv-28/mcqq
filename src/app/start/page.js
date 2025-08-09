@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from "next/link";
 import {
@@ -148,7 +148,13 @@ export default function Setup() {
   });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
+
+  // Ensure component is mounted before accessing localStorage
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const subjects = {
     sports: {
@@ -306,14 +312,16 @@ export default function Setup() {
       // Simulate loading for better UX
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Store form data in localStorage for now (later we'll use proper state management)
-      localStorage.setItem('quizSetup', JSON.stringify({
-        username: formData.username.trim(),
-        subject: formData.subject,
-        subCategory: formData.subCategory,
-        difficulty: formData.difficulty,
-        timestamp: new Date().toISOString()
-      }));
+      // Store form data in localStorage only on client-side
+      if (mounted && typeof window !== 'undefined') {
+        localStorage.setItem('quizSetup', JSON.stringify({
+          username: formData.username.trim(),
+          subject: formData.subject,
+          subCategory: formData.subCategory,
+          difficulty: formData.difficulty,
+          timestamp: Date.now() // Use timestamp instead of ISO string for consistency
+        }));
+      }
       
       // Navigate to quiz page
       router.push('/quiz');
