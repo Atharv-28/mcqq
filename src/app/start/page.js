@@ -312,18 +312,24 @@ export default function Setup() {
       // Simulate loading for better UX
       await new Promise(resolve => setTimeout(resolve, 1000));
       
+      const quizSetupData = {
+        username: formData.username.trim(),
+        subject: formData.subject,
+        subCategory: formData.subCategory,
+        difficulty: formData.difficulty,
+        timestamp: Date.now() // Use timestamp instead of ISO string for consistency
+      };
+      
+      console.log('💾 Saving quiz setup data to localStorage:', quizSetupData);
+      
       // Store form data in localStorage only on client-side
       if (mounted && typeof window !== 'undefined') {
-        localStorage.setItem('quizSetup', JSON.stringify({
-          username: formData.username.trim(),
-          subject: formData.subject,
-          subCategory: formData.subCategory,
-          difficulty: formData.difficulty,
-          timestamp: Date.now() // Use timestamp instead of ISO string for consistency
-        }));
+        localStorage.setItem('quizSetup', JSON.stringify(quizSetupData));
+        console.log('✅ Quiz setup data saved successfully');
       }
       
       // Navigate to quiz page
+      console.log('🧭 Navigating to /quiz page');
       router.push('/quiz');
     }
   };

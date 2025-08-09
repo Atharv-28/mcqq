@@ -18,7 +18,7 @@ import {
   Alert,
   CircularProgress
 } from '@mui/material';
-import { ArrowBack, Timer, QuestionMark } from '@mui/icons-material';
+import { ArrowBack, Timer, QuestionMark, Error as ErrorIcon } from '@mui/icons-material';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import quizAPI from '../../services/api';
 import styles from './page.module.css';
@@ -70,75 +70,64 @@ const theme = createTheme({
   },
 });
 
-function Quiz() {
-  const router = useRouter();
-  const [mounted, setMounted] = useState(false);
+export default function Quiz() {
   const [quizSetup, setQuizSetup] = useState(null);
   const [questions, setQuestions] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [quizStarted, setQuizStarted] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [answers, setAnswers] = useState([]);
   const [timeLeft, setTimeLeft] = useState(30);
+  const [loading, setLoading] = useState(true);
+  const [quizStarted, setQuizStarted] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [error, setError] = useState(null);
+  const [questionsLoading, setQuestionsLoading] = useState(false);
+  const [startTime, setStartTime] = useState(null);
+  const router = useRouter();
 
-  // Mount effect
+  // Ensure component is mounted
   useEffect(() => {
     setMounted(true);
-    
-    // Get quiz setup from localStorage
-    if (typeof window !== 'undefined') {
-      const setup = localStorage.getItem('quizSetup');
-      if (setup) {
-        const parsedSetup = JSON.parse(setup);
-        setQuizSetup(parsedSetup);
-        fetchQuestions(parsedSetup);
+  }, []);
+
+  // Load quiz setup and fetch questions from API
+  useEffect(() => {
+    if (mounted && typeof window !== 'undefined') {
+      const setupData = localStorage.getItem('quizSetup');
+      if (setupData) {
+        const parsed = JSON.parse(setupData);
+        setQuizSetup(parsed);
+        fetchQuestions(parsed);
       } else {
+        // Redirect to setup if no data found
         router.push('/start');
       }
     }
-  }, [router]);
+  }, [mounted, router]);
 
   // Fetch questions from backend
   const fetchQuestions = async (setup) => {
     try {
-      setLoading(true);
+      setQuestionsLoading(true);
       setError(null);
-      
-      console.log('🚀 Starting to fetch questions with setup:', setup);
-      
-      // Capitalize difficulty for backend API
-      const capitalizedDifficulty = setup.difficulty.charAt(0).toUpperCase() + setup.difficulty.slice(1);
-      
-      console.log('📡 Calling quizAPI.generateQuestions with params:', {
-        subject: setup.subject,
-        subCategory: setup.subCategory,
-        difficulty: capitalizedDifficulty,
-        count: 10
-      });
       
       const response = await quizAPI.generateQuestions(
         setup.subject,
         setup.subCategory,
-        capitalizedDifficulty,
+        setup.difficulty,
         10
       );
       
-      console.log('📦 Received response from API:', response);
-      
-      if (response.success && response.questions && response.questions.length > 0) {
-        console.log('✅ Questions loaded successfully:', response.questions.length, 'questions');
+      if (response.success && response.questions) {
         setQuestions(response.questions);
       } else {
-        console.log('❌ Failed to load questions. Response:', response);
-        setError('Failed to load questions. Please try again.');
+        throw new Error(response.message || 'Failed to fetch questions');
       }
-    } catch (error) {
-      console.error('💥 Error fetching questions:', error);
-      console.error('Error details:', error.message, error.stack);
-      setError('Failed to connect to server. Please try again.');
+    } catch (err) {
+      console.error('Error fetching questions:', err);
+      setError(err.message || 'Failed to load questions. Please try again.');
     } finally {
+      setQuestionsLoading(false);
       setLoading(false);
     }
   };
@@ -159,6 +148,7 @@ function Quiz() {
   const startQuiz = () => {
     setQuizStarted(true);
     setTimeLeft(30);
+    setStartTime(Date.now());
   };
 
   const handleAnswerSelect = (answerIndex) => {
@@ -169,10 +159,12 @@ function Quiz() {
     // Save the answer
     const newAnswer = {
       questionId: questions[currentQuestionIndex].id,
+      question: questions[currentQuestionIndex].question,
       selectedAnswer: selectedAnswer,
       correctAnswer: questions[currentQuestionIndex].correctAnswer,
       isCorrect: selectedAnswer === questions[currentQuestionIndex].correctAnswer,
-      timeSpent: 30 - timeLeft
+      timeSpent: 30 - timeLeft,
+      options: questions[currentQuestionIndex].options
     };
 
     const updatedAnswers = [...answers, newAnswer];
@@ -193,6 +185,7 @@ function Quiz() {
     const score = finalAnswers.filter(answer => answer.isCorrect).length;
     const totalQuestions = questions.length;
     const percentage = Math.round((score / totalQuestions) * 100);
+    const timeTaken = Math.round((Date.now() - startTime) / 1000); // in seconds
 
     const quizData = {
       username: quizSetup.username,
@@ -203,7 +196,7 @@ function Quiz() {
       correctAnswers: score,
       score,
       percentage,
-      timeTaken: Math.round((Date.now() - (quizSetup.startTime || Date.now())) / 1000),
+      timeTaken,
       questionsData: finalAnswers,
       completedAt: Date.now()
     };
@@ -211,18 +204,27 @@ function Quiz() {
     try {
       // Submit results to backend
       await quizAPI.submitQuizResults(quizData);
-    } catch (error) {
-      console.error('Error submitting quiz results:', error);
-      // Continue anyway - we'll store locally
-    }
-
-    // Store results in localStorage for results page
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('quizResults', JSON.stringify(quizData));
+      
+      // Store results in localStorage for results page
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('quizResults', JSON.stringify(quizData));
+      }
+    } catch (err) {
+      console.error('Error submitting quiz results:', err);
+      // Still store locally even if backend fails
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('quizResults', JSON.stringify(quizData));
+      }
     }
 
     // Navigate to results page
     router.push('/results');
+  };
+
+  const retryFetchQuestions = () => {
+    if (quizSetup) {
+      fetchQuestions(quizSetup);
+    }
   };
 
   const formatTime = (seconds) => {
@@ -242,7 +244,7 @@ function Quiz() {
           <Box sx={{ textAlign: 'center', color: 'white' }}>
             <CircularProgress size={60} sx={{ color: 'white', mb: 2 }} />
             <Typography variant="h6">
-              Loading quiz questions...
+              {questionsLoading ? 'Loading quiz questions...' : 'Preparing your quiz...'}
             </Typography>
           </Box>
         </Box>
@@ -256,7 +258,8 @@ function Quiz() {
         <div className={styles.page}>
           <Container maxWidth="md" sx={{ py: 4, textAlign: 'center' }}>
             <Paper sx={{ p: 6, borderRadius: 3 }}>
-              <Typography variant="h4" component="h2" sx={{ mb: 2, fontWeight: 700, color: 'error.main' }}>
+              <ErrorIcon sx={{ fontSize: 80, color: 'error.main', mb: 2 }} />
+              <Typography variant="h4" component="h2" sx={{ mb: 2, fontWeight: 700 }}>
                 Oops! Something went wrong
               </Typography>
               <Typography variant="body1" sx={{ mb: 4, color: 'text.secondary' }}>
@@ -266,7 +269,7 @@ function Quiz() {
               <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
                 <Button
                   variant="contained"
-                  onClick={() => fetchQuestions(quizSetup)}
+                  onClick={retryFetchQuestions}
                   sx={{
                     background: 'linear-gradient(45deg, #667eea, #764ba2)',
                   }}
@@ -505,5 +508,3 @@ function Quiz() {
     </ThemeProvider>
   );
 }
-
-export default Quiz;
