@@ -228,7 +228,7 @@ export default function Results() {
                           flexDirection: 'column',
                         }}
                       >
-                        <Typography variant="h4" component="div" sx={{ fontWeight: 800 }}>
+                        <Typography variant="h5" component="div" sx={{ fontWeight: 800 }}>
                           {results.percentage}%
                         </Typography>
                         <Typography variant="h6" sx={{ fontWeight: 700, color: performance.color }}>
