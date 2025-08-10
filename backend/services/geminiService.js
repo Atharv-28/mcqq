@@ -6,37 +6,36 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 // Subject categories mapping
 const subjectCategories = {
   'Technology': [
-    'Programming', 'Web Development', 'Mobile Development', 'AI & Machine Learning',
-    'Data Science', 'Cybersecurity', 'Cloud Computing', 'DevOps', 'Blockchain',
-    'Internet of Things', 'Software Engineering', 'Database Management'
+    'Programming', 'Web Development', 'AI & Machine Learning',
+    'Hardware', 'Cybersecurity', 'Software'
   ],
   'Science': [
-    'Physics', 'Chemistry', 'Biology', 'Mathematics', 'Astronomy',
-    'Environmental Science', 'Geology', 'Medicine', 'Genetics', 'Botany'
+    'Physics', 'Chemistry', 'Biology', 'Space & Astronomy',
+    'Environmental Science', 'Medical Science'
   ],
   'Sports': [
     'Football', 'Basketball', 'Cricket', 'Tennis', 'Olympics',
-    'Formula 1', 'Swimming', 'Athletics', 'Golf', 'Baseball'
+    'Formula 1'
   ],
   'History': [
-    'World Wars', 'Ancient Civilizations', 'Medieval History', 'Modern History',
-    'American History', 'European History', 'Asian History', 'African History'
+    'World Wars', 'Ancient History', 'Medieval Period', 'Modern History',
+    'American History', 'Indian History'
   ],
   'Geography': [
-    'World Capitals', 'Countries & Continents', 'Natural Landmarks', 'Climate',
-    'Population & Demographics', 'Physical Geography', 'Political Geography'
+    'World Capitals', 'Countries & Flags', 'Mountains & Rivers', 'Climate & Weather',
+    'Continents', 'Famous Landmarks'
   ],
   'Entertainment': [
     'Movies', 'Music', 'TV Shows', 'Books & Literature', 'Gaming',
-    'Celebrity Trivia', 'Awards & Festivals', 'Comic Books'
+    'Celebrities'
   ],
   'Politics': [
-    'World Politics', 'Government Systems', 'Political Leaders', 'Elections',
-    'International Relations', 'Political Parties', 'Constitutional Law'
+    'World Politics', 'Government Systems', 'Political History', 'US Politics',
+    'Indian Politics', 'European Politics'
   ],
-  'Business': [
-    'Economics', 'Finance', 'Marketing', 'Management', 'Entrepreneurship',
-    'Stock Market', 'Cryptocurrency', 'Business Strategy'
+  'General Knowledge': [
+    'Current Affairs', 'Business & Economy', 'Invention & Discoveries', 'Award & Honors', 'Culture & Traditions',
+    'Mixed Topics'
   ]
 };
 
