@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -126,9 +126,72 @@ export default function Rankings() {
     if (mounted) {
       loadLeaderboardData();
     }
-  }, [mounted, tabValue]); // Add tabValue as dependency
+  }, [mounted, tabValue, loadLeaderboardData]);
 
-  const loadLeaderboardData = async () => {
+  // Helper function to get subject filter for API
+  const getSubjectFilter = (tabIndex) => {
+    switch (tabIndex) {
+      case 1: return 'Technology';
+      case 2: return 'Sports';
+      case 3: return 'Science';
+      default: return null; // All subjects
+    }
+  };
+
+  // Fallback function to load from localStorage (in case API is down)
+  const loadLocalStorageData = async () => {
+    let allUserResults = [];
+    if (typeof window !== 'undefined') {
+      // Try to get all quiz history first
+      const historyData = localStorage.getItem('quizHistory');
+      if (historyData) {
+        allUserResults = JSON.parse(historyData);
+      } else {
+        // Fallback to single result if no history exists
+        const resultsData = localStorage.getItem('quizResults');
+        if (resultsData) {
+          allUserResults = [JSON.parse(resultsData)];
+          setUserResults(JSON.parse(resultsData));
+        }
+      }
+    }
+
+    // Convert localStorage data to leaderboard format
+    let leaderboardData = [];
+    if (allUserResults.length > 0) {
+      leaderboardData = allUserResults.map(result => ({
+        username: result.username,
+        score: result.score,
+        totalQuestions: result.totalQuestions,
+        percentage: result.percentage,
+        subject: result.subject,
+        subCategory: result.subCategory,
+        difficulty: result.difficulty,
+        completedAt: result.completedAt || Date.now(),
+        avatar: null
+      }));
+      
+      // Sort by percentage (highest first)
+      leaderboardData.sort((a, b) => b.percentage - a.percentage);
+    }
+
+    setLeaderboard(leaderboardData);
+    
+    // Calculate user's best rank
+    if (allUserResults.length > 0) {
+      // Find the best performance (highest percentage)
+      const bestResult = allUserResults.reduce((best, current) => 
+        current.percentage > best.percentage ? current : best
+      );
+      
+      const userBestIndex = leaderboardData.findIndex(entry => 
+        entry.username === bestResult.username && entry.percentage === bestResult.percentage
+      );
+      setUserRank(userBestIndex + 1);
+    }
+  };
+
+  const loadLeaderboardData = useCallback(async () => {
     setLoading(true); // Make sure loading is set when fetching new data
     try {
       // Get current user's username from localStorage
@@ -193,75 +256,7 @@ export default function Rankings() {
       
       setLoading(false);
     }
-  };
-
-  // Helper function to get subject filter for API
-  const getSubjectFilter = (tabIndex) => {
-    switch (tabIndex) {
-      case 1: return 'Technology';
-      case 2: return 'Sports';
-      case 3: return 'Science';
-      default: return null; // All subjects
-    }
-  };
-
-  // Fallback function to load from localStorage (in case API is down)
-  const loadLocalStorageData = async () => {
-    let allUserResults = [];
-    if (typeof window !== 'undefined') {
-      // Try to get all quiz history first
-      const historyData = localStorage.getItem('quizHistory');
-      if (historyData) {
-        allUserResults = JSON.parse(historyData);
-      } else {
-        // Fallback to single result if no history exists
-        const resultsData = localStorage.getItem('quizResults');
-        if (resultsData) {
-          allUserResults = [JSON.parse(resultsData)];
-        }
-      }
-      
-      if (allUserResults.length > 0) {
-        setUserResults(allUserResults[allUserResults.length - 1]); // Set latest result
-      }
-    }
-
-    // Create leaderboard with user's quiz results
-    let leaderboardData = [];
-    
-    if (allUserResults.length > 0) {
-      leaderboardData = allUserResults.map((result, index) => ({
-        id: result.completedAt || Date.now() + index,
-        username: result.username,
-        score: result.score,
-        totalQuestions: result.totalQuestions,
-        percentage: result.percentage,
-        subject: result.subject,
-        subCategory: result.subCategory,
-        difficulty: result.difficulty,
-        completedAt: result.completedAt || Date.now(),
-        avatar: null
-      }));
-      
-      // Sort by percentage (highest first)
-      leaderboardData.sort((a, b) => b.percentage - a.percentage);
-    }
-
-    setLeaderboard(leaderboardData);
-    
-    // Calculate user's best rank
-    if (allUserResults.length > 0) {
-      // Find the best performance (highest percentage)
-      const bestResult = allUserResults.reduce((best, current) => 
-        current.percentage > best.percentage ? current : best
-      );
-      
-      const userBestIndex = leaderboardData.findIndex(entry => 
-        entry.username === bestResult.username && entry.percentage === bestResult.percentage
-      );
-      setUserRank(userBestIndex + 1);
-    }
-  };
+  }, [tabValue]);
 
   const handleTabChange = (event, newValue) => {
     console.log('Tab changed to:', newValue, 'Subject:', getSubjectFilter(newValue));

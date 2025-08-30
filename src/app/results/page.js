@@ -188,7 +188,7 @@ export default function Results() {
                 Quiz Results {performance.icon}
               </Typography>
               <Typography variant="h6" sx={{ color: 'rgba(255, 255, 255, 0.9)' }}>
-                {results.username}, here's how you performed!
+                {results.username}, here&apos;s how you performed!
               </Typography>
             </Box>
 

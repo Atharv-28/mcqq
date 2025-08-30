@@ -381,7 +381,7 @@ export default function Setup() {
                     Ready for the Challenge?
                   </Typography>
                   <Typography variant="h6" sx={{ opacity: 0.9, mb: 3, lineHeight: 1.5, px: { xs: 2, lg: 0 } }}>
-                    Set up your quiz preferences and let's test your knowledge with AI-generated questions!
+                    Set up your quiz preferences and let&apos;s test your knowledge with AI-generated questions!
                   </Typography>
                   <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap' }}>
                     <Card sx={{ minWidth: 120, textAlign: 'center', backgroundColor: 'rgba(255, 255, 255, 0.15)' }}>

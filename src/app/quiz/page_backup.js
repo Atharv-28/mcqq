@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Box,
@@ -143,7 +143,7 @@ export default function Quiz() {
       // Auto-submit when time runs out
       handleNextQuestion();
     }
-  }, [timeLeft, quizStarted]);
+  }, [timeLeft, quizStarted, handleNextQuestion]);
 
   const startQuiz = () => {
     setQuizStarted(true);
@@ -155,7 +155,7 @@ export default function Quiz() {
     setSelectedAnswer(answerIndex);
   };
 
-  const handleNextQuestion = () => {
+  const handleNextQuestion = useCallback(() => {
     // Save the answer
     const newAnswer = {
       questionId: questions[currentQuestionIndex].id,
@@ -179,7 +179,7 @@ export default function Quiz() {
       // Quiz completed, navigate to results
       finishQuiz(updatedAnswers);
     }
-  };
+  }, [questions, currentQuestionIndex, selectedAnswer, timeLeft, answers]);
 
   const finishQuiz = async (finalAnswers) => {
     const score = finalAnswers.filter(answer => answer.isCorrect).length;
@@ -372,7 +372,7 @@ export default function Quiz() {
                     <strong>Instructions:</strong><br />
                     • You have 30 seconds per question<br />
                     • Click on your answer choice to select it<br />
-                    • Click "Next Question" to proceed<br />
+                    • Click &quot;Next Question&quot; to proceed<br />
                     • You cannot go back to previous questions
                   </Typography>
                 </Alert>
