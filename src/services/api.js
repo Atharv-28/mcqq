@@ -1,5 +1,5 @@
 // API Service for MCQ Quiz Application
-const API_BASE_URL = 'http://localhost:5001/api';
+const API_BASE_URL = 'https://mcqq.onrender.com/api';
 
 class QuizAPI {
   async request(url, options = {}) {
