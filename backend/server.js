@@ -4,7 +4,8 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
-const { connectDB, createTables } = require('./config/database');
+// Database removed - using in-memory storage
+// const { connectDB, createTables } = require('./config/database');
 // const authRoutes = require('./routes/auth'); // Removed - no authentication needed
 const quizRoutes = require('./routes/quiz');
 const leaderboardRoutes = require('./routes/leaderboard');
@@ -42,7 +43,7 @@ app.get('/', (req, res) => {
     message: 'MCQ Quiz API is running!', 
     version: '1.0.0',
     timestamp: new Date().toISOString(),
-    status: 'Database connection disabled for testing',
+    status: 'No database - using in-memory storage',
     availableEndpoints: [
       'GET /',
       'GET /health',
@@ -71,7 +72,7 @@ app.get('/health', (req, res) => {
   });
 });
 
-// API Routes - All enabled with database connection
+// API Routes - All using in-memory storage (no database)
 app.use('/api/quiz', quizRoutes);           // Quiz operations
 app.use('/api/leaderboard', leaderboardRoutes); // Leaderboard and stats
 app.use('/api/questions', questionRoutes);     // Question management
@@ -94,23 +95,18 @@ app.use('*', (req, res) => {
   });
 });
 
-// Initialize database and start server
+// Initialize server without database
 async function startServer() {
   try {
-    // Connect to database
-    await connectDB();
-    console.log('✅ Database connected successfully');
-    
-    // Create tables if they don't exist
-    await createTables();
-    console.log('✅ Database tables created/verified');
+    // No database connection needed
+    console.log('✅ Running without database - using in-memory storage');
     
     // Start server
     app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📡 API endpoint: http://localhost:${PORT}`);
       console.log(`🌐 CORS: Allowing all origins (*)`);
-      console.log(`� Database: Connected to PostgreSQL`);
+      console.log(`💾 Storage: In-memory (no database)`);
       console.log(`🔥 Ready for full functionality!`);
     });
   } catch (error) {

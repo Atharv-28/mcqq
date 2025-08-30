@@ -1,7 +1,6 @@
 const express = require('express');
-const { pool } = require('../config/database');
-
 const router = express.Router();
+const storage = require('../config/storage');
 
 // Get global leaderboard
 router.get('/global', async (req, res) => {
@@ -14,91 +13,52 @@ router.get('/global', async (req, res) => {
       timeframe = 'all' // all, week, month
     } = req.query;
 
-    const offset = (page - 1) * limit;
-
-    // Build query with optional filters
-    let query = `
-      SELECT 
-        ROW_NUMBER() OVER (ORDER BY percentage DESC, completed_at ASC) as rank,
-        username,
-        subject,
-        sub_category,
-        difficulty,
-        total_questions,
-        correct_answers,
-        score,
-        percentage,
-        time_taken,
-        completed_at
-      FROM quiz_results
-      WHERE 1=1
-    `;
-
-    const queryParams = [];
-    let paramIndex = 1;
-
-    // Apply filters
+    const filters = { limit: parseInt(limit) };
+    
     if (subject && subject !== 'all') {
-      query += ` AND subject = $${paramIndex}`;
-      queryParams.push(subject);
-      paramIndex++;
+      filters.subject = subject;
     }
-
+    
     if (difficulty && difficulty !== 'all') {
-      query += ` AND difficulty = $${paramIndex}`;
-      queryParams.push(difficulty);
-      paramIndex++;
+      filters.difficulty = difficulty;
     }
 
-    // Apply timeframe filter
-    if (timeframe === 'week') {
-      query += ` AND completed_at >= NOW() - INTERVAL '7 days'`;
-    } else if (timeframe === 'month') {
-      query += ` AND completed_at >= NOW() - INTERVAL '30 days'`;
+    // For timeframe, we'll implement basic filtering
+    let leaderboardData = storage.getLeaderboard(filters);
+    
+    // Apply timeframe filter if needed
+    if (timeframe === 'week' || timeframe === 'month') {
+      const daysAgo = timeframe === 'week' ? 7 : 30;
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - daysAgo);
+      
+      leaderboardData = leaderboardData.filter(result => 
+        new Date(result.completedAt) >= cutoffDate
+      );
     }
 
-    // Complete the query
-    query += ` ORDER BY percentage DESC, completed_at ASC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
-    queryParams.push(limit, offset);
+    // Apply pagination
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+    const paginatedData = leaderboardData.slice(offset, offset + parseInt(limit));
+    
+    // Add rank numbers
+    const rankedData = paginatedData.map((result, index) => ({
+      ...result,
+      rank: offset + index + 1
+    }));
 
-    const results = await pool.query(query, queryParams);
-
-    // Get total count for pagination
-    let countQuery = 'SELECT COUNT(*) FROM quiz_results WHERE 1=1';
-    const countParams = [];
-    let countParamIndex = 1;
-
-    if (subject && subject !== 'all') {
-      countQuery += ` AND subject = $${countParamIndex}`;
-      countParams.push(subject);
-      countParamIndex++;
-    }
-
-    if (difficulty && difficulty !== 'all') {
-      countQuery += ` AND difficulty = $${countParamIndex}`;
-      countParams.push(difficulty);
-      countParamIndex++;
-    }
-
-    if (timeframe === 'week') {
-      countQuery += ` AND completed_at >= NOW() - INTERVAL '7 days'`;
-    } else if (timeframe === 'month') {
-      countQuery += ` AND completed_at >= NOW() - INTERVAL '30 days'`;
-    }
-
-    const countResult = await pool.query(countQuery, countParams);
-    const totalCount = parseInt(countResult.rows[0].count);
+    const totalCount = leaderboardData.length;
 
     res.json({
       success: true,
       data: {
-        leaderboard: results.rows,
+        leaderboard: rankedData,
         pagination: {
           currentPage: parseInt(page),
-          totalPages: Math.ceil(totalCount / limit),
+          totalPages: Math.ceil(totalCount / parseInt(limit)),
           totalCount,
-          hasNext: offset + limit < totalCount,
-          hasPrev: page > 1
+          hasNext: offset + parseInt(limit) < totalCount,
+          hasPrev: parseInt(page) > 1
         },
         filters: {
           subject: subject || 'all',
@@ -123,100 +83,35 @@ router.get('/rank/:username', async (req, res) => {
   try {
     const { username } = req.params;
     const { subject, difficulty } = req.query;
-
-    // Get user's best score
-    let userQuery = `
-      SELECT percentage, completed_at
-      FROM quiz_results 
-      WHERE username = $1
-    `;
     
-    const userParams = [username];
-    let userParamIndex = 2;
-
+    const filters = {};
     if (subject && subject !== 'all') {
-      userQuery += ` AND subject = $${userParamIndex}`;
-      userParams.push(subject);
-      userParamIndex++;
+      filters.subject = subject;
     }
-
     if (difficulty && difficulty !== 'all') {
-      userQuery += ` AND difficulty = $${userParamIndex}`;
-      userParams.push(difficulty);
-      userParamIndex++;
+      filters.difficulty = difficulty;
     }
-
-    userQuery += ` ORDER BY percentage DESC, completed_at ASC LIMIT 1`;
-
-    const userResult = await pool.query(userQuery, userParams);
-
-    if (userResult.rows.length === 0) {
+    
+    // Get user's results with filters
+    const userResults = storage.getQuizResults({ username, ...filters });
+    
+    if (userResults.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'No quiz results found for this user'
       });
     }
-
-    const userBestScore = userResult.rows[0];
-
+    
+    // Get user's best score
+    const userBestScore = userResults[0]; // Already sorted by percentage DESC
+    
     // Get user's rank
-    let rankQuery = `
-      SELECT COUNT(*) + 1 as rank
-      FROM (
-        SELECT DISTINCT username, MAX(percentage) as best_percentage
-        FROM quiz_results
-        WHERE 1=1
-    `;
-
-    const rankParams = [];
-    let rankParamIndex = 1;
-
-    if (subject && subject !== 'all') {
-      rankQuery += ` AND subject = $${rankParamIndex}`;
-      rankParams.push(subject);
-      rankParamIndex++;
-    }
-
-    if (difficulty && difficulty !== 'all') {
-      rankQuery += ` AND difficulty = $${rankParamIndex}`;
-      rankParams.push(difficulty);
-      rankParamIndex++;
-    }
-
-    rankQuery += `
-        GROUP BY username
-        HAVING MAX(percentage) > $${rankParamIndex}
-      ) as better_users
-    `;
-    rankParams.push(userBestScore.percentage);
-
-    const rankResult = await pool.query(rankQuery, rankParams);
-    const rank = parseInt(rankResult.rows[0].rank);
-
-    // Get total users count
-    let totalUsersQuery = `
-      SELECT COUNT(DISTINCT username) as total_users
-      FROM quiz_results
-      WHERE 1=1
-    `;
-
-    const totalUsersParams = [];
-    let totalUsersParamIndex = 1;
-
-    if (subject && subject !== 'all') {
-      totalUsersQuery += ` AND subject = $${totalUsersParamIndex}`;
-      totalUsersParams.push(subject);
-      totalUsersParamIndex++;
-    }
-
-    if (difficulty && difficulty !== 'all') {
-      totalUsersQuery += ` AND difficulty = $${totalUsersParamIndex}`;
-      totalUsersParams.push(difficulty);
-      totalUsersParamIndex++;
-    }
-
-    const totalUsersResult = await pool.query(totalUsersQuery, totalUsersParams);
-    const totalUsers = parseInt(totalUsersResult.rows[0].total_users);
+    const rank = storage.getUserRank(username, filters);
+    
+    // Get total users count for this filter
+    const allResults = storage.getQuizResults(filters);
+    const uniqueUsers = [...new Set(allResults.map(r => r.username.toLowerCase()))];
+    const totalUsers = uniqueUsers.length;
 
     res.json({
       success: true,
@@ -225,7 +120,7 @@ router.get('/rank/:username', async (req, res) => {
         rank,
         totalUsers,
         bestScore: userBestScore.percentage,
-        completedAt: userBestScore.completed_at,
+        completedAt: userBestScore.completedAt,
         percentile: totalUsers > 0 ? Math.round(((totalUsers - rank + 1) / totalUsers) * 100) : 0
       }
     });
@@ -243,92 +138,111 @@ router.get('/rank/:username', async (req, res) => {
 // Get leaderboard statistics
 router.get('/stats', async (req, res) => {
   try {
-    // Get overall statistics
-    const statsQuery = `
-      SELECT 
-        COUNT(*) as total_quizzes,
-        COUNT(DISTINCT username) as total_users,
-        AVG(percentage) as avg_percentage,
-        MAX(percentage) as highest_score,
-        MIN(percentage) as lowest_score,
-        AVG(time_taken) as avg_time_taken
-      FROM quiz_results
-    `;
-
-    const statsResult = await pool.query(statsQuery);
-    const overallStats = statsResult.rows[0];
-
+    const stats = storage.getStats();
+    const allResults = storage.getQuizResults();
+    
+    // Calculate overall statistics
+    let totalScore = 0;
+    let totalTime = 0;
+    let highestScore = 0;
+    let lowestScore = 100;
+    
+    allResults.forEach(result => {
+      totalScore += result.percentage;
+      totalTime += result.timeTaken || 0;
+      highestScore = Math.max(highestScore, result.percentage);
+      lowestScore = Math.min(lowestScore, result.percentage);
+    });
+    
+    const averagePercentage = allResults.length > 0 ? totalScore / allResults.length : 0;
+    const averageTime = allResults.length > 0 ? Math.round(totalTime / allResults.length) : 0;
+    
     // Get subject distribution
-    const subjectStatsQuery = `
-      SELECT 
-        subject,
-        COUNT(*) as quiz_count,
-        AVG(percentage) as avg_percentage,
-        COUNT(DISTINCT username) as unique_users
-      FROM quiz_results
-      GROUP BY subject
-      ORDER BY quiz_count DESC
-    `;
-
-    const subjectStatsResult = await pool.query(subjectStatsQuery);
-
+    const subjectStats = {};
+    allResults.forEach(result => {
+      if (!subjectStats[result.subject]) {
+        subjectStats[result.subject] = {
+          quizCount: 0,
+          totalPercentage: 0,
+          users: new Set()
+        };
+      }
+      subjectStats[result.subject].quizCount++;
+      subjectStats[result.subject].totalPercentage += result.percentage;
+      subjectStats[result.subject].users.add(result.username.toLowerCase());
+    });
+    
+    const bySubject = Object.entries(subjectStats).map(([subject, data]) => ({
+      subject,
+      quizCount: data.quizCount,
+      averagePercentage: (data.totalPercentage / data.quizCount).toFixed(1),
+      uniqueUsers: data.users.size
+    })).sort((a, b) => b.quizCount - a.quizCount);
+    
     // Get difficulty distribution
-    const difficultyStatsQuery = `
-      SELECT 
+    const difficultyStats = {};
+    allResults.forEach(result => {
+      if (!difficultyStats[result.difficulty]) {
+        difficultyStats[result.difficulty] = {
+          quizCount: 0,
+          totalPercentage: 0
+        };
+      }
+      difficultyStats[result.difficulty].quizCount++;
+      difficultyStats[result.difficulty].totalPercentage += result.percentage;
+    });
+    
+    const byDifficulty = ['Easy', 'Medium', 'Hard'].map(difficulty => {
+      const data = difficultyStats[difficulty];
+      return data ? {
         difficulty,
-        COUNT(*) as quiz_count,
-        AVG(percentage) as avg_percentage
-      FROM quiz_results
-      GROUP BY difficulty
-      ORDER BY 
-        CASE difficulty 
-          WHEN 'Easy' THEN 1 
-          WHEN 'Medium' THEN 2 
-          WHEN 'Hard' THEN 3 
-        END
-    `;
-
-    const difficultyStatsResult = await pool.query(difficultyStatsQuery);
-
+        quizCount: data.quizCount,
+        averagePercentage: (data.totalPercentage / data.quizCount).toFixed(1)
+      } : {
+        difficulty,
+        quizCount: 0,
+        averagePercentage: '0.0'
+      };
+    });
+    
     // Get recent activity (last 7 days)
-    const recentActivityQuery = `
-      SELECT 
-        DATE(completed_at) as date,
-        COUNT(*) as quiz_count
-      FROM quiz_results
-      WHERE completed_at >= NOW() - INTERVAL '7 days'
-      GROUP BY DATE(completed_at)
-      ORDER BY date DESC
-    `;
-
-    const recentActivityResult = await pool.query(recentActivityQuery);
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    
+    const recentResults = allResults.filter(result => 
+      new Date(result.completedAt) >= sevenDaysAgo
+    );
+    
+    const recentActivity = [];
+    for (let i = 0; i < 7; i++) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toISOString().split('T')[0];
+      
+      const dayResults = recentResults.filter(result => 
+        result.completedAt.split('T')[0] === dateStr
+      );
+      
+      recentActivity.push({
+        date: dateStr,
+        quizCount: dayResults.length
+      });
+    }
 
     res.json({
       success: true,
       data: {
         overall: {
-          totalQuizzes: parseInt(overallStats.total_quizzes),
-          totalUsers: parseInt(overallStats.total_users),
-          averagePercentage: parseFloat(overallStats.avg_percentage || 0).toFixed(1),
-          highestScore: parseFloat(overallStats.highest_score || 0),
-          lowestScore: parseFloat(overallStats.lowest_score || 0),
-          averageTime: parseInt(overallStats.avg_time_taken || 0)
+          totalQuizzes: stats.totalQuizzes,
+          totalUsers: stats.totalUsers,
+          averagePercentage: averagePercentage.toFixed(1),
+          highestScore: highestScore,
+          lowestScore: allResults.length > 0 ? lowestScore : 0,
+          averageTime: averageTime
         },
-        bySubject: subjectStatsResult.rows.map(row => ({
-          subject: row.subject,
-          quizCount: parseInt(row.quiz_count),
-          averagePercentage: parseFloat(row.avg_percentage).toFixed(1),
-          uniqueUsers: parseInt(row.unique_users)
-        })),
-        byDifficulty: difficultyStatsResult.rows.map(row => ({
-          difficulty: row.difficulty,
-          quizCount: parseInt(row.quiz_count),
-          averagePercentage: parseFloat(row.avg_percentage).toFixed(1)
-        })),
-        recentActivity: recentActivityResult.rows.map(row => ({
-          date: row.date,
-          quizCount: parseInt(row.quiz_count)
-        }))
+        bySubject,
+        byDifficulty,
+        recentActivity
       }
     });
 
@@ -338,6 +252,32 @@ router.get('/stats', async (req, res) => {
       success: false,
       message: 'Failed to fetch statistics',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Get leaderboard with optional subject filtering (simple endpoint)
+router.get('/', async (req, res) => {
+  try {
+    const { limit = 100, subject } = req.query;
+    
+    const filters = { limit: parseInt(limit) };
+    if (subject) {
+      filters.subject = subject;
+    }
+    
+    const leaderboardData = storage.getLeaderboard(filters);
+    
+    res.json({
+      success: true,
+      data: leaderboardData
+    });
+    
+  } catch (error) {
+    console.error('Error fetching leaderboard:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch leaderboard data'
     });
   }
 });
